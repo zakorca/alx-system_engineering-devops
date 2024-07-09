@@ -1,4 +1,3 @@
-
 #!/usr/bin/env bash
 # Configure Nginx so that return the hostname of the server Nginx is running on
 
