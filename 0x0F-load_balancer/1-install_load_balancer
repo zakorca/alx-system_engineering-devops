@@ -1,3 +1,21 @@
-#!/bin/bash
-# script that makes a request to 0.0.0.0:5000/catch_me that causes the server to respond with a message containing You got me!, in the body of the response
-curl -sX PUT -L "0.0.0.0:5000/catch_me" -d "user_id=98" -H "origin: School"
+#!/usr/bin/env bash
+# Install and configure HAproxy on my load balancer lb-01 server.
+apt-get install -y --no-install-recommends software-properties-common
+add-apt-repository -y ppa:vbernat/haproxy-2.0
+apt-get -y update
+apt-get -y install haproxy=2.0.\*
+
+echo "
+frontend hajarita_http
+	bind *:80
+	mode http
+	default_backend hajarita_backend
+backend hajarita_backend
+	balance roundrobin
+	server 408412-web-01 34.229.189.169:80 check
+	server 408412-web-02 54.160.125.224:80 check
+" >> /etc/haproxy/haproxy.cfg
+
+echo "ENABLED=1" >> /etc/default/haproxy
+
+service haproxy restart
