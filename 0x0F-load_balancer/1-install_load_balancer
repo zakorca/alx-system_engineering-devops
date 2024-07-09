@@ -1,21 +1,10 @@
+
 #!/usr/bin/env bash
-# Install and configure HAproxy on my load balancer lb-01 server.
-apt-get install -y --no-install-recommends software-properties-common
-add-apt-repository -y ppa:vbernat/haproxy-2.0
-apt-get -y update
-apt-get -y install haproxy=2.0.\*
+# Configure Nginx so that return the hostname of the server Nginx is running on
 
-echo "
-frontend hajarita_http
-	bind *:80
-	mode http
-	default_backend hajarita_backend
-backend hajarita_backend
-	balance roundrobin
-	server 408412-web-01 34.229.189.169:80 check
-	server 408412-web-02 54.160.125.224:80 check
-" >> /etc/haproxy/haproxy.cfg
-
-echo "ENABLED=1" >> /etc/default/haproxy
-
-service haproxy restart
+sudo apt-get -y update
+sudo apt-get -y install nginx
+sudo sed -i "48i\\\tadd_header X-Served-By \"$HOSTNAME\";\n" /etc/nginx/sites-available/default
+echo "Hello World!" | sudo tee /var/www/html/index.html
+echo "Ceci n'est pas une page" | sudo tee /var/www/html/404.html
+sudo service nginx start
