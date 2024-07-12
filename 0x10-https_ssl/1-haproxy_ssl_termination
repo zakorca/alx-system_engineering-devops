@@ -1,51 +1,94 @@
-global
-        log /dev/log    local0
-        log /dev/log    local1 notice
-        chroot /var/lib/haproxy
-        stats socket /run/haproxy/admin.sock mode 660 level admin expose-fd listeners
-        stats timeout 30s
-        user haproxy
-        group haproxy
-        daemon
+#!/usr/bin/env bash
+#Zak config haproxy
+sudo apt update
+sudo apt install snapd
+sudo apt-get remove certbot
+sudo apt-get install certbot
+sudo service haproxy stop
 
-        # Default SSL material locations
-        ca-base /etc/ssl/certs
-        crt-base /etc/ssl/private
+# Obtain SSL certificates
+sudo certbot certonly --standalone --preferred-challenges http --http-01-port 80 -d lougui77.tech
+sudo certbot certonly --standalone --preferred-challenges http --http-01-port 80 -d web-01.lougui77.tech
+sudo certbot certonly --standalone --preferred-challenges http --http-01-port 80 -d web-02.lougui77.tech
+sudo certbot certonly --standalone --preferred-challenges http --http-01-port 80 -d www.lougui77.tech
+sudo certbot certonly --standalone --preferred-challenges http --http-01-port 80 -d lb-01.lougui77.tech
+: << 'EOF'
+when khalid start the above commands this following domains (lougui77.tech
+web-01.lougui77.tech
+web-02.lougui77.tech) are failed
 
-        # See: https://ssl-config.mozilla.org/#server=haproxy&server-version=2.0.3&config=intermediate
-        ssl-default-bind-ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384
-        ssl-default-bind-ciphersuites TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256
-        ssl-default-bind-options ssl-min-ver TLSv1.2 no-tls-tickets
+i think because dont start with 'www' and 
+lb-01.lougui77.tech success 
 
-defaults
-        log     global
-        mode    http
-        option  httplog
-        option  dontlognull
-        timeout connect 5000
-        timeout client  50000
-        timeout server  50000
-        errorfile 400 /etc/haproxy/errors/400.http
-        errorfile 403 /etc/haproxy/errors/403.http
-        errorfile 408 /etc/haproxy/errors/408.http
-        errorfile 500 /etc/haproxy/errors/500.http
-        errorfile 502 /etc/haproxy/errors/502.http
-        errorfile 503 /etc/haproxy/errors/503.http
-        errorfile 504 /etc/haproxy/errors/504.http
+because www.lougui77.tech && lb-01.lougui77.tech
+are same ip
+EOF
 
 
-frontend hajarita_http
+
+# List the contents of the SSL certificates directory
+sudo ls /etc/letsencrypt/live/www.lougui77.tech
+sudo ls /etc/letsencrypt/live/lb-01.lougui77.tech
+
+
+# Create the directory for HAProxy certificates
+sudo mkdir -p /etc/haproxy/certs
+
+: << 'EOF'
+Combine certificate and key into a single file for HAProxy
+EOF
+
+DOMAINS=(
+    "www.lougui77.tech"
+    "lb-01.lougui77.tech"
+)
+for DOMAIN in "${DOMAINS[@]}"; do
+    CERT_DIR="/etc/letsencrypt/live/$DOMAIN"
+    HAPROXY_CERT_DIR="/etc/haproxy/certs"
+    sudo cat "$CERT_DIR/fullchain.pem" "$CERT_DIR/privkey.pem" | sudo tee "$HAPROXY_CERT_DIR/$DOMAIN.pem"
+    echo "done !!"
+done
+
+
+# Set appropriate permissions for the certificates directory
+sudo chmod -R go-rwx /etc/haproxy/certs
+# Edit HAProxy configuration file
+sudo vi /etc/haproxy/haproxy.cfg # here we add requirement of task 1 in ssl project
+
+
+: << 'EOF'
+_____________first append this to frontend 1
+        mode http
+        http-request redirect scheme https code 301 unless { ssl_fc }
+        http-request set-header X_Forwarded-Proto http
+        default_backend khalid_servers
+
+_____________second create frontend 2 like this
+        frontend khalid77-tech-https
+            bind *:443 ssl crt /etc/haproxy/certs/www.lougui77.tech.pem
+            http-request set-header X-Forwarded-Proto https
+            default_backend khalid_servers
+_____________this is the final config
+"""   
+    frontend khalid77-tech
         bind *:80
         mode http
-        redirect scheme https code 301 if !{ ssl_fc }
+        http-request redirect scheme https code 301 unless { ssl_fc }
+        http-request set-header X-Forwarded-Proto http
+        default_backend khalid_servers
 
-frontend hajarita_https
-        bind *:443 ssl crt /etc/letsencrypt/live/www.hajarita.tech/www.hajarita.tech.pem
-        mode http
-        http-request add-header X-Forwarded-Proto https
-        default_backend hajarita_backend
+    frontend khalid77-tech-https
+        bind *:443 ssl crt /etc/haproxy/certs/www.lougui77.tech.pem
+        http-request set-header X-Forwarded-Proto https
+        default_backend khalid_servers
 
-backend hajarita_backend
+    backend khalid_servers
         balance roundrobin
-        server 408412-web-01 34.229.189.169:80 check
-        server 408412-web-02 54.160.125.224:80 check
+        server 510461-web-01 100.27.0.26:80 check
+        server 510461-web-02 54.90.56.60:80 check
+"""
+EOF
+
+
+
+sudo service haproxy restart
