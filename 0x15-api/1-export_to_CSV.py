@@ -1,21 +1,29 @@
 #!/usr/bin/python3
-""" export data in the CSV format """
-import csv
+"""script that, using this REST API, for a given employee ID,
+returns information about his/her TODO list progress
+"""
+import re
 import requests
-import sys
+from sys import argv
 
 
 if __name__ == "__main__":
-    url_user = "https://jsonplaceholder.typicode.com/users/"
-    url_todos = "https://jsonplaceholder.typicode.com/todos"
-    user = requests.get(url_user + "{}".format(sys.argv[1])).json()
-    todos = requests.get(url_todos, params={"userId": sys.argv[1]}).json()
+    API = "https://jsonplaceholder.typicode.com"
+    if re.fullmatch(r'\d+', argv[1]):
+        id = int(argv[1])
 
-    user_id = sys.argv[1]
-    username = user.get("username")
+        usr_json = requests.get(f'{API}/users/{id}').json()
+        todos_json = requests.get(f'{API}/todos').json()
 
-    with open("{}.csv".format(user_id), "w") as f:
-        writer = csv.writer(f, quoting=csv.QUOTE_ALL)
-        for task in todos:
-            writer.writerow([user_id, username,
-                             task.get("completed"), task.get("title")])
+        user_name = usr_json.get('name')
+        usr_todos = [task for task in todos_json if task.get('userId') == id]
+        todos_done = [task for task in usr_todos if task.get('completed')]
+
+        print('Employee {} is done with tasks({}/{}):'.format(user_name,
+                                                              len(todos_done),
+                                                              len(usr_todos)
+                                                              )
+              )
+
+        for task in todos_done:
+            print('\t {}'.format(task.get('title')))
